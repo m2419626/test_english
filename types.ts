@@ -12,7 +12,7 @@ export interface Question {
   type: QuestionType;
   questionText?: string;
   options?: Option[];
-  correctAnswer?: string; // e.g., 'A', 'B', 'C', 'D' or the word for FILL
+  correctAnswer?: string;
   marks: number;
 }
 
@@ -25,10 +25,6 @@ export interface ExamSection {
   parts: ExamPart[];
 }
 
-/**
- * Represents a specific part of an exam section.
- * Added 'description' property to support instructional text in parts like Section 3 Writing.
- */
 export interface ExamPart {
   id: string;
   title: string;
@@ -38,14 +34,10 @@ export interface ExamPart {
   questions: Question[];
 }
 
-export interface UserAnswer {
-  questionId: string;
-  answer: string;
-}
-
 export interface ExamState {
   currentSectionIndex: number;
   currentPartIndex: number;
   answers: Record<string, string>;
+  selectedTopicIndex: number | null; // 新增：紀錄寫作題目編號 (0, 1, 2)
   isSubmitted: boolean;
 }

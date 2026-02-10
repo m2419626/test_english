@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Question } from '../types';
 
 interface Props {
@@ -7,36 +7,71 @@ interface Props {
   selectedAnswer?: string;
   onAnswerChange: (answer: string) => void;
   disabled?: boolean;
+  isCorrectionMode?: boolean;
+  selectedTopicIndex?: number | null;
+  onSelectTopic?: (index: number) => void;
+  aiTutorFeedback?: string | null;
+  isReanalyzing?: boolean;
+  onAdoptCorrection?: () => void;
+  hasCorrectionAvailable?: boolean;
+  correctedTranslation?: string | null;
 }
 
-const QuestionCard: React.FC<Props> = ({ question, selectedAnswer, onAnswerChange, disabled }) => {
-  const isCorrect = disabled && selectedAnswer?.toLowerCase() === question.correctAnswer?.toLowerCase();
-  const isWrong = disabled && selectedAnswer && selectedAnswer?.toLowerCase() !== question.correctAnswer?.toLowerCase();
-  const isUnanswered = disabled && (!selectedAnswer || selectedAnswer.trim() === "");
+const QuestionCard: React.FC<Props> = ({ 
+  question, 
+  selectedAnswer, 
+  onAnswerChange, 
+  disabled, 
+  isCorrectionMode, 
+  selectedTopicIndex,
+  onSelectTopic,
+  aiTutorFeedback,
+  isReanalyzing,
+  onAdoptCorrection,
+  hasCorrectionAvailable,
+  correctedTranslation
+}) => {
+  const [showSuccess, setShowSuccess] = useState(false);
 
+  const topics = [
+    "1. My favourite online content creator",
+    "2. How young people reduce stress",
+    "3. Advantages and disadvantages of exams"
+  ];
+
+  const handleAdopt = () => {
+    if (onAdoptCorrection) {
+      onAdoptCorrection();
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 2000);
+    }
+  };
+
+  const isCorrect = selectedAnswer?.toLowerCase() === question.correctAnswer?.toLowerCase();
+  
   const renderMCQ = () => (
     <div className="grid grid-cols-1 gap-4 mt-8">
       {question.options?.map((opt) => {
         const isThisSelected = selectedAnswer === opt.label;
-        const isThisCorrect = disabled && opt.label === question.correctAnswer;
+        const isThisCorrectAnswer = opt.label === question.correctAnswer;
         
         let borderColor = "border-white/5 hover:border-white/20";
         let bgColor = "bg-white/[0.02]";
         let textColor = "text-slate-400";
 
         if (isThisSelected) {
-          borderColor = "border-cyan-500/50 shadow-[0_0_15px_rgba(34,211,238,0.1)]";
-          bgColor = "bg-cyan-500/5";
+          borderColor = isCorrectionMode ? "border-amber-500/50" : "border-cyan-500/50 shadow-[0_0_15px_rgba(34,211,238,0.1)]";
+          bgColor = isCorrectionMode ? "bg-amber-500/5" : "bg-cyan-500/5";
           textColor = "text-white";
         }
 
-        if (disabled) {
-          if (isThisCorrect) {
-            borderColor = "border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)]";
+        if (disabled || isCorrectionMode) {
+          if (isThisCorrectAnswer && (disabled || (isCorrectionMode && isThisSelected))) {
+            borderColor = "border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.1)]";
             bgColor = "bg-emerald-500/10";
             textColor = "text-emerald-300";
-          } else if (isThisSelected && !isThisCorrect) {
-            borderColor = "border-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.2)]";
+          } else if (isThisSelected && !isThisCorrectAnswer) {
+            borderColor = "border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.1)]";
             bgColor = "bg-rose-500/10";
             textColor = "text-rose-300";
           }
@@ -47,15 +82,14 @@ const QuestionCard: React.FC<Props> = ({ question, selectedAnswer, onAnswerChang
             key={opt.label}
             disabled={disabled}
             onClick={() => onAnswerChange(opt.label)}
-            className={`group w-full text-left p-6 rounded-2xl border transition-all flex items-center space-x-6 ${borderColor} ${bgColor} ${disabled ? 'cursor-default' : 'hover:scale-[1.01] active:scale-[0.98]'}`}
+            className={`group w-full text-left p-6 rounded-2xl border transition-all flex items-center space-x-6 ${borderColor} ${bgColor} ${disabled ? 'cursor-default' : 'hover:scale-[1.01]'}`}
           >
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center border font-black transition-all ${isThisSelected ? 'bg-cyan-500 border-cyan-400 text-slate-950 scale-110 shadow-[0_0_15px_#22d3ee]' : 'border-white/10 text-slate-500 group-hover:border-white/30 group-hover:text-white'}`}>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center border font-black transition-all ${isThisSelected ? (isCorrectionMode ? 'bg-amber-500 text-slate-950 border-amber-400' : 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]') : 'border-white/10 text-slate-500 group-hover:border-white/30'}`}>
               {opt.label}
             </div>
             <div className={`flex-grow font-semibold text-lg tracking-tight ${textColor}`}>
               {opt.text}
             </div>
-            {disabled && isThisCorrect && <i className="fa-solid fa-circle-check text-emerald-500 text-xl animate-pulse"></i>}
           </button>
         );
       })}
@@ -69,61 +103,119 @@ const QuestionCard: React.FC<Props> = ({ question, selectedAnswer, onAnswerChang
         disabled={disabled}
         value={selectedAnswer || ''}
         onChange={(e) => onAnswerChange(e.target.value)}
-        placeholder="INPUT DATA HERE..."
-        className={`w-full p-6 rounded-2xl border bg-white/[0.03] text-white font-bold text-xl tracking-tight focus:outline-none focus:border-cyan-500 focus:shadow-[0_0_20px_rgba(34,211,238,0.2)] transition-all placeholder:text-slate-700 ${
-          disabled ? (isCorrect ? 'border-emerald-500 bg-emerald-500/5' : 'border-rose-500 bg-rose-500/5') : 'border-white/10'
+        placeholder="INPUT DATA..."
+        className={`w-full p-6 rounded-2xl border bg-white/[0.03] text-white font-bold text-xl focus:outline-none transition-all ${
+          (disabled || isCorrectionMode) ? (isCorrect ? 'border-emerald-500 bg-emerald-500/5' : 'border-rose-500 bg-rose-500/5') : 'border-white/10 focus:border-cyan-500 shadow-inner'
         }`}
       />
-      {disabled && (
-        <div className="mt-6 p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-emerald-400 text-sm font-bold flex items-center">
-          <i className="fa-solid fa-key mr-3"></i>
-          VERIFIED DATA: <span className="ml-2 text-white">{question.correctAnswer}</span>
+      {(disabled || isCorrectionMode) && (
+        <div className="mt-4 flex items-center space-x-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
+          <i className="fa-solid fa-key text-cyan-500/50"></i>
+          <span>Correct Value:</span> 
+          <span className="text-white bg-white/10 px-2 py-0.5 rounded">{question.correctAnswer}</span>
         </div>
       )}
     </div>
   );
 
   const renderWriting = () => (
-    <div className="mt-8">
-      <div className="relative">
-        <textarea
-          disabled={disabled}
-          value={selectedAnswer || ''}
-          onChange={(e) => onAnswerChange(e.target.value)}
-          rows={15}
-          placeholder="COMMENCE COMPOSITION..."
-          className="w-full p-8 rounded-3xl border border-white/10 bg-white/[0.02] text-white font-medium text-lg focus:outline-none focus:border-cyan-500 focus:shadow-[0_0_30px_rgba(34,211,238,0.1)] transition-all resize-none leading-relaxed"
-        />
-        <div className="absolute top-0 right-0 p-4 font-mono text-[10px] text-slate-600 tracking-widest uppercase">
-          Neural Uplink: Stable
+    <div className="mt-8 space-y-8">
+      {/* Topic Selection Buttons */}
+      <div className="space-y-4">
+        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Select Your Essay Topic (Required)</span>
+        <div className="grid grid-cols-1 gap-2">
+          {topics.map((topic, idx) => (
+            <button
+              key={idx}
+              disabled={disabled && !isCorrectionMode}
+              onClick={() => onSelectTopic?.(idx)}
+              className={`p-4 rounded-xl text-left text-sm font-bold border transition-all ${
+                selectedTopicIndex === idx 
+                ? 'bg-cyan-500/10 border-cyan-500 text-cyan-400 shadow-lg' 
+                : 'bg-white/5 border-white/5 text-slate-500 hover:border-white/20'
+              }`}
+            >
+              {topic}
+            </button>
+          ))}
         </div>
       </div>
-      <div className="mt-6 flex justify-between items-center">
-        <div className="text-[10px] font-black text-slate-600 tracking-widest uppercase flex items-center">
-          <span className="w-2 h-2 rounded-full bg-cyan-500 mr-2 animate-pulse"></span>
-          Word Count Sensor: <span className="ml-2 text-cyan-400">{(selectedAnswer || '').trim().split(/\s+/).filter(Boolean).length}</span>
+
+      {selectedTopicIndex !== null && (
+        <div className="space-y-8 animate-in fade-in slide-in-from-top-4">
+          <div className="relative">
+            <textarea
+              disabled={disabled && !isCorrectionMode}
+              value={selectedAnswer || ''}
+              onChange={(e) => onAnswerChange(e.target.value)}
+              rows={15}
+              placeholder="START WRITING YOUR ESSAY HERE..."
+              className={`w-full p-10 rounded-[2.5rem] border text-white font-medium text-lg focus:outline-none transition-all resize-none leading-relaxed ${isCorrectionMode ? 'border-amber-500/20 bg-amber-500/5 focus:border-amber-500 shadow-[0_0_40px_rgba(245,158,11,0.05)]' : 'border-white/10 bg-white/[0.02] focus:border-cyan-500 shadow-inner'}`}
+            />
+            {showSuccess && (
+              <div className="absolute inset-0 bg-amber-500/10 backdrop-blur-[4px] rounded-[2.5rem] flex items-center justify-center z-50 animate-in fade-in duration-500">
+                <div className="bg-amber-500 text-slate-950 px-8 py-4 rounded-full font-black text-xs uppercase tracking-[0.2em] shadow-2xl flex items-center">
+                  <i className="fa-solid fa-check-double mr-3"></i> 修正已套用
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {(aiTutorFeedback || isReanalyzing) && (
+            <div className={`glass p-10 rounded-[2rem] border transition-all duration-700 ${isReanalyzing ? 'border-amber-500/50 bg-amber-500/10 animate-pulse' : 'border-amber-500/20 bg-amber-900/5 shadow-2xl shadow-amber-900/10'}`}>
+               <div className="flex items-center justify-between mb-8">
+                 <div className="flex items-center space-x-3 text-amber-500">
+                   <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center">
+                     <i className={`fa-solid ${isReanalyzing ? 'fa-spinner fa-spin' : 'fa-stairs'}`}></i>
+                   </div>
+                   <span className="text-[10px] font-black uppercase tracking-[0.3em]">Neural Diagnostic Mode</span>
+                 </div>
+                 {isCorrectionMode && hasCorrectionAvailable && !isReanalyzing && (
+                   <button onClick={handleAdopt} className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center shadow-lg active:scale-95 group">
+                     <i className="fa-solid fa-wand-magic-sparkles mr-2 group-hover:rotate-12 transition-transform"></i> 採納 AI 階梯修正
+                   </button>
+                 )}
+               </div>
+               
+               <div className={`text-slate-300 text-base leading-relaxed markdown-content transition-opacity duration-500 whitespace-pre-wrap ${isReanalyzing ? 'opacity-30' : 'opacity-100'}`}>
+                 {aiTutorFeedback}
+                 
+                 {correctedTranslation && !isReanalyzing && (
+                   <div className="mt-8 pt-8 border-t border-white/10">
+                     <h4 className="text-cyan-500 text-[10px] font-black uppercase tracking-widest mb-4">修正版全文中譯：</h4>
+                     <p className="text-slate-300 italic text-sm leading-relaxed">
+                       {correctedTranslation}
+                     </p>
+                   </div>
+                 )}
+               </div>
+            </div>
+          )}
+          
+          <div className="flex items-center space-x-4">
+            <div className="h-px flex-grow bg-white/5"></div>
+            <div className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] flex items-center">
+              Word Count: <span className={`ml-2 ${isCorrectionMode ? 'text-amber-400' : 'text-cyan-400'}`}>{(selectedAnswer || '').trim().split(/\s+/).filter(Boolean).length}</span>
+            </div>
+            <div className="h-px flex-grow bg-white/5"></div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 
   return (
-    <div className={`p-10 rounded-[2.5rem] glass border-2 transition-all relative overflow-hidden ${disabled && isCorrect ? 'border-emerald-500/30' : disabled && (isWrong || isUnanswered) ? 'border-rose-500/30' : 'border-white/10 shadow-xl'}`}>
-      {/* Decorative Corner */}
-      <div className="absolute top-0 left-0 w-12 h-12 border-t-2 border-l-2 border-cyan-500/20 rounded-tl-[2.5rem]"></div>
-      
+    <div className={`p-10 rounded-[3rem] glass border-2 transition-all relative overflow-hidden ${isCorrectionMode ? 'border-amber-500/20 shadow-[0_0_50px_rgba(245,158,11,0.05)]' : (disabled && isCorrect ? 'border-emerald-500/20' : 'border-white/10 shadow-xl')}`}>
       <div className="flex justify-between items-center mb-10">
         <div className="flex items-center space-x-3">
-          <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full"></span>
-          <span className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.4em]">Sector {question.number}</span>
+          <div className={`w-1 h-1 rounded-full ${isCorrectionMode ? 'bg-amber-500' : 'bg-cyan-500'}`}></div>
+          <span className={`text-[10px] font-black uppercase tracking-[0.5em] ${isCorrectionMode ? 'text-amber-500' : 'text-cyan-500'}`}>Part {question.number}</span>
         </div>
-        <div className="bg-white/5 px-4 py-1.5 rounded-full border border-white/5">
-          <span className="text-[10px] font-black text-slate-500 tracking-widest uppercase">{question.marks} CREDITS</span>
-        </div>
+        <div className="px-3 py-1 bg-white/5 rounded-lg border border-white/5 text-[9px] font-black text-slate-500 uppercase tracking-widest">{question.marks} MARKS</div>
       </div>
       
       {question.questionText && (
-        <p className="text-white font-black text-2xl leading-[1.2] tracking-tight italic">{question.questionText}</p>
+        <p className="text-white font-black text-2xl tracking-tight italic leading-snug">{question.questionText}</p>
       )}
 
       {question.type === 'MCQ' && renderMCQ()}
